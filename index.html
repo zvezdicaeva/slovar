@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Govoreči slikovni slovar in zlogovalnik</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Fredoka & Nunito za izredno berljivo pisavo za otroke (jasen 'a' in 'g') -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Nunito', 'sans-serif'],
+                        display: ['Fredoka', 'sans-serif'],
+                    },
+                    animation: {
+                        'bounce-short': 'bounceShort 0.5s ease-in-out',
+                        'pulse-glow': 'pulseGlow 1.2s infinite',
+                        'pop': 'pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                    },
+                    keyframes: {
+                        bounceShort: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        pulseGlow: {
+                            '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+                            '50%': { transform: 'scale(1.06)', opacity: '0.9' },
+                        },
+                        pop: {
+                            '0%': { transform: 'scale(0.85)', opacity: '0.5' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #fef9c3 100%);
+            min-height: 100vh;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Skrij drsnik pri vrstici za hiter izbor besed, a ohrani drsenje */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .btn-3d {
+            transition: all 0.15s ease;
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
+        }
+        .btn-3d:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+        }
+        .syllable-pill {
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.12);
+        }
+        .syllable-pill:active {
+            transform: translateY(3px) scale(0.98);
+        }
+        .syllable-active {
+            transform: scale(1.14) translateY(-6px) !important;
+            box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.25), 0 0 0 4px #ffffff, 0 0 0 8px currentColor !important;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col justify-between p-3 sm:p-5 md:p-6">
+
+    <!-- GLAVNI VSEBNIK -->
+    <div class="max-w-4xl w-full mx-auto flex flex-col gap-4 sm:gap-5">
+
+        <!-- ZGORNJA VRSTICA: NASLOV IN GUMB ZA UČITELJSKI KOTIČEK -->
+        <header class="flex flex-wrap items-center justify-between gap-3 bg-white/90 backdrop-blur-md px-4 py-3 rounded-3xl shadow-sm border border-sky-100">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white text-2xl shadow-md">
+                    🗣️
+                </div>
+                <div>
+                    <h1 class="font-display text-lg sm:text-2xl font-bold text-slate-800 leading-tight">
+                        Govoreči slikovni slovar
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-500 font-semibold">
+                        Učenje branja, zlogovanja in glasov
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Indikator govora -->
+                <div id="speakingIndicator" class="hidden items-center gap-1.5 bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold animate-pulse">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span>Govorim ...</span>
+                </div>
+
+                <!-- Gumb za odpiranje/zapiranje učiteljskega kotička -->
+                <button id="toggleTeacherBtn" onclick="toggleTeacherPanel()" 
+                    class="flex items-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-3.5 py-2.5 rounded-2xl border-2 border-amber-300 transition text-sm sm:text-base cursor-pointer">
+                    <span>👩‍🏫</span>
+                    <span class="hidden sm:inline">Učiteljski kotiček</span>
+                    <span class="sm:hidden">Vnos</span>
+                    <svg id="teacherChevron" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- UČITELJSKI KOTIČEK (Zložljiv panel) -->
+        <section id="teacherPanel" class="hidden bg-white rounded-3xl p-4 sm:p-6 shadow-lg border-2 border-amber-200 animate-pop">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <h2 class="font-display text-lg sm:text-xl font-bold text-amber-900 flex items-center gap-2">
+                    <span>✏️</span> Učiteljski vnos nove besede
+                </h2>
+                <button onclick="toggleTeacherPanel()" class="text-slate-400 hover:text-slate-600 p-1 rounded-xl font-bold text-sm">
+                    Zapri ✕
+                </button>
+            </div>
+
+            <form id="addWordForm" onsubmit="handleCustomWord(event)" class="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-end">
+                <!-- Vnos besede -->
+                <div class="md:col-span-5">
+                    <label for="customWordInput" class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+                        Vpiši slovensko besedo
+                    </label>
+                    <input type="text" id="customWordInput" placeholder="npr. LOKOMOTIVA, SLON, METULJ..." required
+                        oninput="updateLiveSyllablePreview()"
+                        class="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-sky-500 focus:outline-none text-lg font-bold uppercase text-slate-800 bg-slate-50">
+                </div>
+
+                <!-- Predogled/ročni popravek zlogov -->
+                <div class="md:col-span-4">
+                    <label for="customSyllablesInput" class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+                        Zlogi (samodejno ali popravi z -)
+                    </label>
+                    <input type="text" id="customSyllablesInput" placeholder="LO-KO-MO-TI-VA"
+                        class="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-sky-500 focus:outline-none text-lg font-bold uppercase text-sky-700 bg-sky-50/50">
+                </div>
+
+                <!-- Izbira ikone/emojija -->
+                <div class="md:col-span-3">
+                    <label for="customEmojiInput" class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+                        Sličica (emoji)
+                    </label>
+                    <div class="flex gap-2">
+                        <input type="text" id="customEmojiInput" value="🌟" maxlength="4"
+                            class="w-16 text-center px-2 py-3 rounded-2xl border-2 border-slate-200 focus:border-sky-500 focus:outline-none text-2xl bg-slate-50">
+                        <button type="submit" 
+                            class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold py-3 px-4 rounded-2xl shadow-md transition cursor-pointer text-sm sm:text-base">
+                            Prikaži
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Hitri predlogi emojijev za učiteljico -->
+            <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                <span class="text-xs font-bold text-slate-400 mr-1">Hitra izbira sličice:</span>
+                <button type="button" onclick="setEmoji('🚂')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🚂</button>
+                <button type="button" onclick="setEmoji('🐘')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🐘</button>
+                <button type="button" onclick="setEmoji('🐶')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🐶</button>
+                <button type="button" onclick="setEmoji('🚗')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🚗</button>
+                <button type="button" onclick="setEmoji('🍓')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🍓</button>
+                <button type="button" onclick="setEmoji('🌳')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🌳</button>
+                <button type="button" onclick="setEmoji('⚽')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">⚽</button>
+                <button type="button" onclick="setEmoji('🧸')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🧸</button>
+                <button type="button" onclick="setEmoji('🚁')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🚁</button>
+                <button type="button" onclick="setEmoji('🐢')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🐢</button>
+                <button type="button" onclick="setEmoji('🌈')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🌈</button>
+                <button type="button" onclick="setEmoji('🦉')" class="emoji-pick text-xl p-1.5 hover:bg-slate-100 rounded-xl transition">🦉</button>
+            </div>
+
+            <!-- Nastavitve glasu in diagnostika -->
+            <div class="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-bold text-slate-600">🔊 Glas bralnika:</span>
+                    <select id="voiceSelect" onchange="changeSelectedVoice()" class="bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700 max-w-xs">
+                        <option value="">Nalagam glasove...</option>
+                    </select>
+                </div>
+                <div id="voiceStatusBadge" class="font-semibold text-slate-500"></div>
+            </div>
+        </section>
+
+        <!-- TRAK ZA HITER IZBOR BESED -->
+        <nav aria-label="Seznam besed" class="bg-white/80 backdrop-blur-sm p-2 rounded-2xl shadow-sm border border-white flex items-center gap-2">
+            <button onclick="prevWord()" title="Prejšnja beseda" 
+                class="shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 font-black flex items-center justify-center transition cursor-pointer text-lg">
+                ◀
+            </button>
+            
+            <div id="wordCarousel" class="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 px-1">
+                <!-- Gumbi besed se dinamično izrišejo tukaj -->
+            </div>
+
+            <button onclick="nextWord()" title="Naslednja beseda" 
+                class="shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 font-black flex items-center justify-center transition cursor-pointer text-lg">
+                ▶
+            </button>
+        </nav>
+
+        <!-- OSREDNJA KARTICA S SLIKO IN BESEDO -->
+        <main class="bg-white rounded-[2.2rem] p-5 sm:p-8 shadow-xl border-4 border-white flex flex-col items-center justify-center relative overflow-hidden">
+            
+            <!-- Dekorativni krogi v ozadju -->
+            <div class="absolute -top-16 -left-16 w-48 h-48 bg-sky-100/60 rounded-full pointer-events-none"></div>
+            <div class="absolute -bottom-16 -right-16 w-56 h-56 bg-amber-100/60 rounded-full pointer-events-none"></div>
+
+            <!-- Števec kartice (npr. 1 / 14) -->
+            <div class="w-full flex justify-between items-center mb-2 z-10">
+                <span id="cardCounter" class="text-xs sm:text-sm font-extrabold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                    1 / 14
+                </span>
+                <button onclick="speakCurrentWordSlow()" title="Ponovi besedo" class="text-xs sm:text-sm font-bold text-sky-600 hover:text-sky-800 bg-sky-50 px-3 py-1 rounded-full transition cursor-pointer">
+                    🔊 Poslušaj znova
+                </button>
+            </div>
+
+            <!-- OKVIR ZA ILUSTRACIJO PREDMETA -->
+            <div id="illustrationBox" onclick="speakCurrentWordSlow()" 
+                class="z-10 my-2 w-48 h-48 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-[2rem] bg-gradient-to-b from-sky-50 to-indigo-50/70 border-4 border-sky-100 shadow-inner flex items-center justify-center cursor-pointer transition-transform duration-300 hover:scale-105 group">
+                <div id="illustrationContent" class="w-36 h-36 sm:w-48 sm:h-48 md:w-52 md:h-52 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+                    <!-- SVG ilustracija ali velik emoji -->
+                </div>
+            </div>
+
+            <!-- OBMOČJE ZA PRIKAZ BESEDE / ZLOGOV / ZAČETNEGA GLASU -->
+            <div id="wordDisplayContainer" class="z-10 mt-4 sm:mt-6 min-h-[5.5rem] sm:min-h-[6.5rem] flex flex-col items-center justify-center w-full">
+                <!-- Dinamična vsebina: Cela beseda, Barvni zlogi ali Začetni glas -->
+            </div>
+
+            <!-- Namig za interakcijo z zlogi (prikaže se v načinu zlogovanja) -->
+            <p id="interactionHint" class="z-10 mt-2 text-xs sm:text-sm font-bold text-slate-400 text-center min-h-[1.25rem]">
+                Klikni na sliko ali izberi gumb spodaj!
+            </p>
+        </main>
+
+        <!-- TRIJE VELIKI OTROKOM PRIJAZNI GUMBI POD SLIKO -->
+        <section aria-label="Učni pripomočki" class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-2">
+            
+            <!-- GUMB 1: ZVOČNIK (Poslušaj besedo) -->
+            <button id="btnSpeakWord" onclick="activateWordMode()" 
+                class="btn-3d bg-gradient-to-b from-sky-400 to-sky-600 hover:from-sky-500 hover:to-sky-700 text-white rounded-3xl p-4 sm:p-5 flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-2 cursor-pointer border-2 border-sky-300">
+                <span class="text-3xl sm:text-4xl drop-shadow">🔊</span>
+                <div class="text-left sm:text-center">
+                    <div class="font-display text-lg sm:text-xl font-bold leading-tight">Poslušaj besedo</div>
+                    <div class="text-xs text-sky-100 font-semibold">Počasi in razločno</div>
+                </div>
+            </button>
+
+            <!-- GUMB 2: ZLOGOVALNIK (Zloguj) -->
+            <button id="btnSyllables" onclick="activateSyllableMode()" 
+                class="btn-3d bg-gradient-to-b from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white rounded-3xl p-4 sm:p-5 flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-2 cursor-pointer border-2 border-amber-300">
+                <span class="text-3xl sm:text-4xl drop-shadow">🧩</span>
+                <div class="text-left sm:text-center">
+                    <div class="font-display text-lg sm:text-xl font-bold leading-tight">Zloguj besedo</div>
+                    <div class="text-xs text-amber-100 font-semibold">Razdeli na zloge</div>
+                </div>
+            </button>
+
+            <!-- GUMB 3: ZAČETNI GLAS -->
+            <button id="btnInitialSound" onclick="activateInitialSoundMode()" 
+                class="btn-3d bg-gradient-to-b from-emerald-400 to-teal-600 hover:from-emerald-500 hover:to-teal-700 text-white rounded-3xl p-4 sm:p-5 flex flex-row sm:flex-col items-center justify-center gap-3 sm:gap-2 cursor-pointer border-2 border-emerald-300">
+                <span class="text-3xl sm:text-4xl drop-shadow">🔤</span>
+                <div class="text-left sm:text-center">
+                    <div class="font-display text-lg sm:text-xl font-bold leading-tight">Začetni glas</div>
+                    <div class="text-xs text-emerald-100 font-semibold">Prvi glas in črka</div>
+                </div>
+            </button>
+
+        </section>
+    </div>
+
+    <!-- OBVESTILNO OKENCE (Toast namesto alert) -->
+    <div id="toastMessage" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-5 py-3 rounded-2xl shadow-xl font-bold text-sm opacity-0 pointer-events-none transition-opacity duration-300 z-50 text-center max-w-md">
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. PAMETNI SLOVENSKI ZLOGOVALNIK (Algoritem za delitev besed na zloge)
+         * ============================================================================
+         * Pravila slovenščine:
+         * - Nosilci zloga so samoglasniki: A, E, I, O, U (ter naglašene različice).
+         * - Zlogotvorni R: R deluje kot samoglasnik, kadar stoji med dvema soglasnikoma
+         *   (npr. VRT, PRST, TRG, ČRKA, SMRK) ali na začetku besede pred soglasnikom (RDEČ, RJAV).
+         * - Soglasnik med dvema samoglasnikoma gre k naslednjemu zlogu (MI-ZA, HI-ŠA).
+         * - Soglasniški sklopi:
+         *   - Dva enaka soglasnika se ločita (OD-DA-JA).
+         *   - Sklop z nezvočnikom + zvočnikom (npr. TR, PR, KR, PL, SL, SM, SN, ŠK, ST, ZD, GR, GL, BR, BL, DR, DL, FR, FL, HR, HL, VR, VL, KV, SV, ZV, ŽV) ostane skupaj na začetku naslednjega zloga.
+         *   - Ostali sklopi se običajno delijo po prvem soglasniku (JA-BOL-KO, MAČ-KA, SON-CE, ME-TULJ).
+         */
+        function syllabifySlovenian(rawWord) {
+            if (!rawWord) return [];
+            const word = rawWord.trim().toUpperCase().replace(/[^A-ZČŠŽĆĐÁÉÍÓÚÀÈÌÒÙÊÔ]/g, '');
+            if (word.length <= 2) return [word];
+
+            const vowels = new Set(['A', 'E', 'I', 'O', 'U', 'Á', 'É', 'Í', 'Ó', 'Ú', 'À', 'È', 'Ì', 'Ò', 'Ù', 'Ê', 'Ô']);
+            const isVowel = (ch) => vowels.has(ch);
+
+            // Ugotovi, ali je 'R' na poziciji i zlogotvoren (med soglasnikoma ali na začetku pred soglasnikom)
+            const isSyllabicR = (w, i) => {
+                if (w[i] !== 'R') return false;
+                const prevIsVowel = i > 0 && isVowel(w[i - 1]);
+                const nextIsVowel = i < w.length - 1 && isVowel(w[i + 1]);
+                if (prevIsVowel || nextIsVowel) return false;
+                // Če je na začetku pred soglasnikom (npr. R-DEČ) ali med dvema soglasnikoma (npr. V-R-T, Č-R-KA)
+                if (i === 0 && w.length > 1 && !isVowel(w[1])) return true;
+                if (i > 0 && i < w.length - 1 && !isVowel(w[i - 1]) && !isVowel(w[i + 1])) return true;
+                return false;
+            };
+
+            // Poišči indekse vseh zlogovnih jeder (samoglasniki + zlogotvorni R)
+            const nuclei = [];
+            for (let i = 0; i < word.length; i++) {
+                if (isVowel(word[i]) || isSyllabicR(word, i)) {
+                    nuclei.push(i);
+                }
+            }
+
+            // Če beseda nima samoglasnikov (npr. kratica), vrni celo
+            if (nuclei.length <= 1) return [word];
+
+            // Sklopi soglasnikov, ki v slovenščini običajno začnejo nov zlog (ne ločimo jih)
+            const onsetClusters = new Set([
+                'BL', 'BR', 'CL', 'CR', 'ČL', 'ČR', 'DL', 'DR', 'FL', 'FR',
+                'GL', 'GR', 'HL', 'HR', 'KL', 'KR', 'KV', 'ML', 'MR', 'PL',
+                'PR', 'SL', 'SM', 'SN', 'SP', 'SR', 'ST', 'SV', 'ŠK', 'ŠL',
+                'ŠM', 'ŠN', 'ŠP', 'ŠR', 'ŠT', 'ŠV', 'TL', 'TR', 'TV', 'VL',
+                'VR', 'ZD', 'ZG', 'ZL', 'ZM', 'ZN', 'ZR', 'ZV', 'ŽG', 'ŽL',
+                'ŽM', 'ŽN', 'ŽR', 'ŽV', 'SK', 'SC', 'SČ', 'ŠČ', 'KN', 'GN', 'PN', 'PS', 'PT', 'KT'
+            ]);
+
+            const splitPoints = [0];
+
+            for (let n = 0; n < nuclei.length - 1; n++) {
+                const startConsonants = nuclei[n] + 1;
+                const endConsonants = nuclei[n + 1]; // ekskluzivno
+                const consonantCount = endConsonants - startConsonants;
+
+                if (consonantCount === 0) {
+                    // Dva samoglasnika skupaj (npr. A-VTO -> AV-TO je sicer V soglasnik, a npr. PO-UK, KA-KAO -> KA-KA-O)
+                    splitPoints.push(endConsonants);
+                } else if (consonantCount === 1) {
+                    // En soglasnik med samoglasnikoma gre k naslednjemu zlogu (MI-ZA, BA-NA-NA)
+                    splitPoints.push(startConsonants);
+                } else if (consonantCount === 2) {
+                    const pair = word.slice(startConsonants, endConsonants);
+                    if (onsetClusters.has(pair)) {
+                        // Sklop ostane skupaj pri drugem zlogu (SE-STRA -> SES-TRA / SE-STRA)
+                        splitPoints.push(startConsonants);
+                    } else {
+                        // Razdeli med soglasnikoma (MAČ-KA, SON-CE, JABOL-KO -> JA-BOL-KO)
+                        splitPoints.push(startConsonants + 1);
+                    }
+                } else {
+                    // 3 ali več soglasnikov: preveri zadnja dva, če tvorita veljaven začetni sklop
+                    const lastTwo = word.slice(endConsonants - 2, endConsonants);
+                    if (onsetClusters.has(lastTwo)) {
+                        splitPoints.push(endConsonants - 2);
+                    } else {
+                        splitPoints.push(endConsonants - 1);
+                    }
+                }
+            }
+
+            splitPoints.push(word.length);
+
+            const syllables = [];
+            for (let i = 0; i < splitPoints.length - 1; i++) {
+                const part = word.slice(splitPoints[i], splitPoints[i + 1]);
+                if (part) syllables.push(part);
+            }
+
+            return syllables;
+        }
+
+        /**
+         * ============================================================================
+         * 2. VNAPREJ PRIPRAVLJEN SLOVAR S KAKOVOSTNIMI VEKTORSKIMI ILUSTRACIJAMI (SVG)
+         * ============================================================================
+         */
+        const DEFAULT_WORDS = [
+            {
+                word: "MIZA",
+                syllables: ["MI", "ZA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="175" rx="75" ry="10" fill="#cbd5e1" opacity="0.5"/>
+                        <rect x="38" y="95" width="14" height="75" rx="4" fill="#92400e"/>
+                        <rect x="148" y="95" width="14" height="75" rx="4" fill="#92400e"/>
+                        <rect x="55" y="95" width="11" height="60" rx="4" fill="#78350f"/>
+                        <rect x="134" y="95" width="11" height="60" rx="4" fill="#78350f"/>
+                        <rect x="25" y="82" width="150" height="18" rx="8" fill="#d97706"/>
+                        <rect x="25" y="82" width="150" height="7" rx="4" fill="#f59e0b"/>
+                      </svg>`
+            },
+            {
+                word: "JABOLKO",
+                syllables: ["JA", "BOL", "KO"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="178" rx="50" ry="9" fill="#cbd5e1" opacity="0.5"/>
+                        <path d="M100 58 Q96 35 108 24" stroke="#78350f" stroke-width="8" stroke-linecap="round" fill="none"/>
+                        <path d="M103 42 Q132 25 142 46 Q122 58 103 42 Z" fill="#22c55e"/>
+                        <path d="M100 62 C65 48, 35 78, 42 122 C48 158, 78 174, 100 165 C122 174, 152 158, 158 122 C165 78, 135 48, 100 62 Z" fill="#ef4444"/>
+                        <path d="M62 82 Q55 102 62 120" stroke="#fca5a5" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.8"/>
+                      </svg>`
+            },
+            {
+                word: "HIŠA",
+                syllables: ["HI", "ŠA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="178" rx="80" ry="9" fill="#cbd5e1" opacity="0.5"/>
+                        <rect x="132" y="38" width="18" height="35" rx="3" fill="#94a3b8"/>
+                        <rect x="45" y="92" width="110" height="82" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="3"/>
+                        <polygon points="30,96 100,32 170,96" fill="#dc2626" stroke="#991b1b" stroke-width="3" stroke-linejoin="round"/>
+                        <rect x="84" y="122" width="32" height="52" rx="4" fill="#92400e"/>
+                        <circle cx="110" cy="150" r="3" fill="#fbbf24"/>
+                        <rect x="56" y="112" width="20" height="20" rx="3" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5"/>
+                        <rect x="124" y="112" width="20" height="20" rx="3" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5"/>
+                      </svg>`
+            },
+            {
+                word: "AVTO",
+                syllables: ["AV", "TO"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="162" rx="82" ry="9" fill="#cbd5e1" opacity="0.5"/>
+                        <path d="M48 98 L66 62 L134 62 L152 98 Z" fill="#3b82f6"/>
+                        <path d="M58 95 L71 69 L96 69 L96 95 Z" fill="#bae6fd"/>
+                        <path d="M104 95 L104 69 L129 69 L142 95 Z" fill="#bae6fd"/>
+                        <rect x="24" y="95" width="152" height="42" rx="16" fill="#2563eb"/>
+                        <rect x="164" y="106" width="10" height="12" rx="4" fill="#fef08a"/>
+                        <rect x="26" y="106" width="8" height="12" rx="3" fill="#f87171"/>
+                        <circle cx="62" cy="138" r="20" fill="#1e293b"/>
+                        <circle cx="62" cy="138" r="9" fill="#cbd5e1"/>
+                        <circle cx="138" cy="138" r="20" fill="#1e293b"/>
+                        <circle cx="138" cy="138" r="9" fill="#cbd5e1"/>
+                      </svg>`
+            },
+            {
+                word: "MAČKA",
+                syllables: ["MAČ", "KA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="176" rx="65" ry="9" fill="#cbd5e1" opacity="0.5"/>
+                        <polygon points="48,88 55,36 88,68" fill="#f97316"/>
+                        <polygon points="56,82 60,48 82,70" fill="#fed7aa"/>
+                        <polygon points="152,88 145,36 112,68" fill="#f97316"/>
+                        <polygon points="144,82 140,48 118,70" fill="#fed7aa"/>
+                        <circle cx="100" cy="112" r="56" fill="#fb923c"/>
+                        <circle cx="80" cy="104" r="7" fill="#1e293b"/>
+                        <circle cx="120" cy="104" r="7" fill="#1e293b"/>
+                        <circle cx="82" cy="102" r="2.5" fill="#ffffff"/>
+                        <circle cx="122" cy="102" r="2.5" fill="#ffffff"/>
+                        <polygon points="94,118 106,118 100,126" fill="#f43f5e"/>
+                        <path d="M88 130 Q94 138 100 126 Q106 138 112 130" stroke="#1e293b" stroke-width="3" fill="none" stroke-linecap="round"/>
+                        <line x1="32" y1="114" x2="66" y2="118" stroke="#7c2d12" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="32" y1="126" x2="66" y2="124" stroke="#7c2d12" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="168" y1="114" x2="134" y2="118" stroke="#7c2d12" stroke-width="2.5" stroke-linecap="round"/>
+                        <line x1="168" y1="126" x2="134" y2="124" stroke="#7c2d12" stroke-width="2.5" stroke-linecap="round"/>
+                      </svg>`
+            },
+            {
+                word: "SONCE",
+                syllables: ["SON", "CE"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <g stroke="#f59e0b" stroke-width="10" stroke-linecap="round">
+                            <line x1="100" y1="18" x2="100" y2="38"/>
+                            <line x1="100" y1="162" x2="100" y2="182"/>
+                            <line x1="18" y1="100" x2="38" y2="100"/>
+                            <line x1="162" y1="100" x2="182" y2="100"/>
+                            <line x1="42" y1="42" x2="56" y2="56"/>
+                            <line x1="144" y1="144" x2="158" y2="158"/>
+                            <line x1="158" y1="42" x2="144" y2="56"/>
+                            <line x1="56" y1="144" x2="42" y2="158"/>
+                        </g>
+                        <circle cx="100" cy="100" r="48" fill="#facc15" stroke="#f59e0b" stroke-width="4"/>
+                        <circle cx="84" cy="92" r="5" fill="#78350f"/>
+                        <circle cx="116" cy="92" r="5" fill="#78350f"/>
+                        <path d="M84 112 Q100 126 116 112" stroke="#78350f" stroke-width="4" fill="none" stroke-linecap="round"/>
+                      </svg>`
+            },
+            {
+                word: "KNJIGA",
+                syllables: ["KNJI", "GA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="174" rx="75" ry="9" fill="#cbd5e1" opacity="0.5"/>
+                        <rect x="42" y="32" width="116" height="136" rx="10" fill="#4f46e5"/>
+                        <rect x="42" y="32" width="22" height="136" rx="4" fill="#312e81"/>
+                        <rect x="76" y="54" width="66" height="36" rx="6" fill="#fef08a"/>
+                        <line x1="86" y1="68" x2="132" y2="68" stroke="#ca8a04" stroke-width="4" stroke-linecap="round"/>
+                        <line x1="86" y1="78" x2="120" y2="78" stroke="#ca8a04" stroke-width="4" stroke-linecap="round"/>
+                        <rect x="122" y="162" width="16" height="16" fill="#ef4444"/>
+                      </svg>`
+            },
+            {
+                word: "ROŽA",
+                syllables: ["RO", "ŽA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <path d="M100 95 L100 178" stroke="#16a34a" stroke-width="9" stroke-linecap="round"/>
+                        <path d="M100 142 Q68 125 64 148 Q84 160 100 142 Z" fill="#22c55e"/>
+                        <path d="M100 128 Q132 110 136 134 Q116 146 100 128 Z" fill="#22c55e"/>
+                        <circle cx="100" cy="48" r="22" fill="#f43f5e"/>
+                        <circle cx="132" cy="70" r="22" fill="#f43f5e"/>
+                        <circle cx="120" cy="106" r="22" fill="#f43f5e"/>
+                        <circle cx="80" cy="106" r="22" fill="#f43f5e"/>
+                        <circle cx="68" cy="70" r="22" fill="#f43f5e"/>
+                        <circle cx="100" cy="78" r="22" fill="#facc15" stroke="#eab308" stroke-width="3"/>
+                      </svg>`
+            },
+            {
+                word: "RIBA",
+                syllables: ["RI", "BA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <polygon points="145,100 182,66 182,134" fill="#0284c7"/>
+                        <path d="M75 56 Q105 32 122 62 Z" fill="#38bdf8"/>
+                        <ellipse cx="92" cy="100" rx="64" ry="38" fill="#0ea5e9"/>
+                        <path d="M75 64 Q88 100 75 136" stroke="#bae6fd" stroke-width="4" fill="none"/>
+                        <circle cx="54" cy="92" r="8" fill="#ffffff"/>
+                        <circle cx="52" cy="92" r="4" fill="#0f172a"/>
+                        <path d="M30 108 Q42 114 48 106" stroke="#0369a1" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                      </svg>`
+            },
+            {
+                word: "KOLO",
+                syllables: ["KO", "LO"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <circle cx="52" cy="134" r="30" fill="none" stroke="#1e293b" stroke-width="7"/>
+                        <circle cx="52" cy="134" r="6" fill="#64748b"/>
+                        <circle cx="148" cy="134" r="30" fill="none" stroke="#1e293b" stroke-width="7"/>
+                        <circle cx="148" cy="134" r="6" fill="#64748b"/>
+                        <polyline points="52,134 86,88 134,88 98,134 52,134" fill="none" stroke="#ef4444" stroke-width="7" stroke-linejoin="round"/>
+                        <line x1="134" y1="88" x2="148" y2="134" stroke="#ef4444" stroke-width="7" stroke-linecap="round"/>
+                        <line x1="86" y1="88" x2="80" y2="72" stroke="#475569" stroke-width="6" stroke-linecap="round"/>
+                        <rect x="68" y="66" width="24" height="8" rx="4" fill="#1e293b"/>
+                        <path d="M134 88 L128 66 L142 66" fill="none" stroke="#475569" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>`
+            },
+            {
+                word: "METULJ",
+                syllables: ["ME", "TULJ"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <path d="M94 64 Q80 38 68 42" stroke="#4c1d95" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <path d="M106 64 Q120 38 132 42" stroke="#4c1d95" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <ellipse cx="64" cy="78" rx="38" ry="30" transform="rotate(-20 64 78)" fill="#a855f7"/>
+                        <ellipse cx="136" cy="78" rx="38" ry="30" transform="rotate(20 136 78)" fill="#a855f7"/>
+                        <ellipse cx="68" cy="126" rx="28" ry="22" transform="rotate(20 68 126)" fill="#ec4899"/>
+                        <ellipse cx="132" cy="126" rx="28" ry="22" transform="rotate(-20 132 126)" fill="#ec4899"/>
+                        <circle cx="60" cy="74" r="10" fill="#fef08a"/>
+                        <circle cx="140" cy="74" r="10" fill="#fef08a"/>
+                        <rect x="93" y="58" width="14" height="88" rx="7" fill="#3b0764"/>
+                      </svg>`
+            },
+            {
+                word: "BANANA",
+                syllables: ["BA", "NA", "NA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="105" cy="172" rx="60" ry="8" fill="#cbd5e1" opacity="0.5"/>
+                        <path d="M44 134 C76 168, 146 154, 162 56 C164 46, 152 42, 146 50 C130 116, 82 132, 42 122 C35 120, 36 128, 44 134 Z" fill="#facc15" stroke="#eab308" stroke-width="3"/>
+                        <rect x="148" y="40" width="10" height="12" rx="3" transform="rotate(20 148 40)" fill="#78350f"/>
+                        <circle cx="39" cy="125" r="4" fill="#78350f"/>
+                      </svg>`
+            },
+            {
+                word: "SLON",
+                syllables: ["SLON"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="176" rx="65" ry="9" fill="#cbd5e1" opacity="0.5"/>
+                        <ellipse cx="52" cy="96" rx="28" ry="38" fill="#94a3b8"/>
+                        <ellipse cx="148" cy="96" rx="28" ry="38" fill="#94a3b8"/>
+                        <circle cx="100" cy="98" r="46" fill="#cbd5e1"/>
+                        <path d="M90 112 Q90 162 114 162 Q122 162 122 150 Q106 150 106 112 Z" fill="#94a3b8"/>
+                        <circle cx="82" cy="88" r="6" fill="#1e293b"/>
+                        <circle cx="118" cy="88" r="6" fill="#1e293b"/>
+                      </svg>`
+            },
+            {
+                word: "ŽOGA",
+                syllables: ["ŽO", "GA"],
+                svg: `<svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-md">
+                        <ellipse cx="100" cy="176" rx="58" ry="9" fill="#cbd5e1" opacity="0.5"/>
+                        <circle cx="100" cy="100" r="64" fill="#f8fafc" stroke="#cbd5e1" stroke-width="3"/>
+                        <polygon points="100,72 124,90 115,118 85,118 76,90" fill="#1e293b"/>
+                        <polygon points="100,36 118,48 100,56 82,48" fill="#1e293b"/>
+                        <polygon points="154,78 162,102 144,110 140,88" fill="#1e293b"/>
+                        <polygon points="46,78 60,88 56,110 38,102" fill="#1e293b"/>
+                        <polygon points="72,154 86,140 114,140 128,154" fill="#1e293b"/>
+                      </svg>`
+            }
+        ];
+
+        /**
+         * ============================================================================
+         * 3. BARVNE PALETE ZA ZLOGE (Živahne, kontrastne in otrokom prijazne)
+         * ============================================================================
+         */
+        const SYLLABLE_STYLES = [
+            { bg: 'bg-sky-500', text: 'text-white', border: 'border-sky-300', ringColor: '#0ea5e9' },
+            { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-300', ringColor: '#f97316' },
+            { bg: 'bg-emerald-500', text: 'text-white', border: 'border-emerald-300', ringColor: '#10b981' },
+            { bg: 'bg-purple-500', text: 'text-white', border: 'border-purple-300', ringColor: '#a855f7' },
+            { bg: 'bg-rose-500', text: 'text-white', border: 'border-rose-300', ringColor: '#f43f5e' },
+            { bg: 'bg-indigo-500', text: 'text-white', border: 'border-indigo-300', ringColor: '#6366f1' },
+        ];
+
+        /**
+         * ============================================================================
+         * 4. STANJE APLIKACIJE IN ZVOČNA SINTEZA (Web Speech API)
+         * ============================================================================
+         */
+        let wordsList = [...DEFAULT_WORDS];
+        let currentIndex = 0;
+        let currentMode = 'word'; // 'word' | 'syllables' | 'initial'
+        let availableVoices = [];
+        let selectedVoice = null;
+        let speechTimer = null;
+
+        // Fonetična predstavitev začetnih glasov za slovenščino (za bolj naraven izgovor in prikaz)
+        const PHONETIC_INITIALS = {
+            'M': { soundDisplay: 'mmm', speakText: 'mmm' },
+            'S': { soundDisplay: 'sss', speakText: 'sss' },
+            'Š': { soundDisplay: 'ššš', speakText: 'ššš' },
+            'Z': { soundDisplay: 'zzz', speakText: 'zzz' },
+            'Ž': { soundDisplay: 'žžž', speakText: 'žžž' },
+            'L': { soundDisplay: 'lll', speakText: 'lll' },
+            'R': { soundDisplay: 'rrr', speakText: 'rrr' },
+            'N': { soundDisplay: 'nnn', speakText: 'nnn' },
+            'V': { soundDisplay: 'vvv', speakText: 'vvv' },
+            'F': { soundDisplay: 'fff', speakText: 'fff' },
+            'H': { soundDisplay: 'hhh', speakText: 'hhh' },
+            'J': { soundDisplay: 'jjj', speakText: 'jjj' },
+            'A': { soundDisplay: 'aaa', speakText: 'aaa' },
+            'E': { soundDisplay: 'eee', speakText: 'eee' },
+            'I': { soundDisplay: 'iii', speakText: 'iii' },
+            'O': { soundDisplay: 'ooo', speakText: 'ooo' },
+            'U': { soundDisplay: 'uuu', speakText: 'uuu' },
+            // Zaporniki in zlitniki se ne morejo podaljševati kot trajniki, zato izgovorimo kratek glas/črko
+            'B': { soundDisplay: 'b', speakText: 'b' },
+            'P': { soundDisplay: 'p', speakText: 'p' },
+            'D': { soundDisplay: 'd', speakText: 'd' },
+            'T': { soundDisplay: 't', speakText: 't' },
+            'G': { soundDisplay: 'g', speakText: 'g' },
+            'K': { soundDisplay: 'k', speakText: 'k' },
+            'C': { soundDisplay: 'c', speakText: 'c' },
+            'Č': { soundDisplay: 'č', speakText: 'č' },
+        };
+
+        // Inicializacija glasov brskalnika
+        function initVoices() {
+            if (!('speechSynthesis' in window)) {
+                updateVoiceStatus('Brskalnik ne podpira govorne sinteze.', false);
+                return;
+            }
+
+            availableVoices = window.speechSynthesis.getVoices();
+            const voiceSelect = document.getElementById('voiceSelect');
+            if (!voiceSelect) return;
+
+            voiceSelect.innerHTML = '';
+
+            if (availableVoices.length === 0) {
+                voiceSelect.innerHTML = '<option value="">Privzeti glas sistema</option>';
+                return;
+            }
+
+            // Razvrsti: najprej sl-SI, nato hr-HR / sr-RS / bs-BA, nato ostali
+            const sortedVoices = [...availableVoices].sort((a, b) => {
+                const score = (v) => {
+                    const lang = v.lang.toLowerCase();
+                    if (lang.startsWith('sl')) return 1;
+                    if (lang.startsWith('hr') || lang.startsWith('sr') || lang.startsWith('bs')) return 2;
+                    return 3;
+                };
+                return score(a) - score(b);
+            });
+
+            sortedVoices.forEach((voice) => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+
+            // Izberi najboljšega
+            const bestVoice = sortedVoices[0];
+            if (bestVoice) {
+                selectedVoice = bestVoice;
+                voiceSelect.value = bestVoice.name;
+
+                const lang = bestVoice.lang.toLowerCase();
+                if (lang.startsWith('sl')) {
+                    updateVoiceStatus('✅ Slovenski glas (sl-SI) je aktiven', true);
+                } else if (lang.startsWith('hr') || lang.startsWith('sr')) {
+                    updateVoiceStatus('ℹ️ Uporabljen sorodni južnoslovanski glas (' + bestVoice.lang + ')', true);
+                } else {
+                    updateVoiceStatus('⚠️ Slovenski glas ni nameščen v napravi (uporabljen: ' + bestVoice.lang + ')', false);
+                }
+            }
+        }
+
+        function updateVoiceStatus(msg, isOptimal) {
+            const badge = document.getElementById('voiceStatusBadge');
+            if (!badge) return;
+            badge.textContent = msg;
+            badge.className = isOptimal ? 'font-bold text-emerald-700' : 'font-bold text-amber-700';
+        }
+
+        function changeSelectedVoice() {
+            const voiceSelect = document.getElementById('voiceSelect');
+            const chosen = availableVoices.find(v => v.name === voiceSelect.value);
+            if (chosen) {
+                selectedVoice = chosen;
+                speakText(wordsList[currentIndex].word.toLowerCase(), 0.75);
+            }
+        }
+
+        // Glavna funkcija za izgovorjavo besedila
+        function speakText(text, rate = 0.75, onEndCallback = null) {
+            if (!('speechSynthesis' in window)) {
+                showToast('Vaš brskalnik žal ne podpira zvočnega branja.');
+                if (onEndCallback) onEndCallback();
+                return;
+            }
+
+            window.speechSynthesis.cancel();
+            const indicator = document.getElementById('speakingIndicator');
+
+            // Zapis z malimi črkami prepreči, da bi bralnik besedo črkoval kot kratico (npr. M-I-Z-A namesto miza)
+            const cleanText = text.toLowerCase();
+
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.lang = 'sl-SI';
+            utterance.rate = rate;
+            utterance.pitch = 1.05; // Rahlo toplejši, prijazen ton za otroke
+
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+
+            utterance.onstart = () => {
+                if (indicator) {
+                    indicator.classList.remove('hidden');
+                    indicator.classList.add('flex');
+                }
+            };
+
+            utterance.onend = () => {
+                if (indicator) {
+                    indicator.classList.add('hidden');
+                    indicator.classList.remove('flex');
+                }
+                if (onEndCallback) onEndCallback();
+            };
+
+            utterance.onerror = () => {
+                if (indicator) {
+                    indicator.classList.add('hidden');
+                    indicator.classList.remove('flex');
+                }
+                if (onEndCallback) onEndCallback();
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Pripravi besedilo posameznega zloga tako, da ga TTS prebere kot zlog in ne črkuje
+        function prepareSyllableForSpeech(syllable) {
+            let s = syllable.toLowerCase();
+            // Če je zlog sestavljen iz ene same črke (npr. "a" ali "o") ali soglasnika, ga ohranimo kratkega
+            return s;
+        }
+
+        /**
+         * ============================================================================
+         * 5. UPRAVLJANJE PRIKAZA IN INTERAKCIJ
+         * ============================================================================
+         */
+        function renderCarousel() {
+            const carousel = document.getElementById('wordCarousel');
+            carousel.innerHTML = '';
+
+            wordsList.forEach((item, idx) => {
+                const isActive = idx === currentIndex;
+                const btn = document.createElement('button');
+                btn.onclick = () => selectWord(idx);
+                btn.className = `shrink-0 px-3.5 py-2 rounded-xl font-display font-bold text-sm sm:text-base transition cursor-pointer flex items-center gap-1.5 ${
+                    isActive 
+                    ? 'bg-sky-500 text-white shadow-md scale-105' 
+                    : 'bg-slate-100 hover:bg-sky-100 text-slate-700'
+                }`;
+                
+                const iconSpan = item.emoji ? `<span>${item.emoji}</span>` : '';
+                btn.innerHTML = `${iconSpan}<span>${item.word}</span>`;
+                carousel.appendChild(btn);
+
+                if (isActive) {
+                    setTimeout(() => {
+                        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    }, 50);
+                }
+            });
+        }
+
+        function renderCard() {
+            clearTimeout(speechTimer);
+            const item = wordsList[currentIndex];
+
+            // Števec
+            document.getElementById('cardCounter').textContent = `${currentIndex + 1} / ${wordsList.length}`;
+
+            // Ilustracija
+            const illusContainer = document.getElementById('illustrationContent');
+            if (item.svg) {
+                illusContainer.innerHTML = item.svg;
+            } else {
+                illusContainer.innerHTML = `<span class="text-[6.5rem] sm:text-[8.5rem] leading-none select-none drop-shadow-md">${item.emoji || '🌟'}</span>`;
+            }
+
+            // Posodobi gumbne poudarke glede na izbrani način
+            updateModeButtonsUI();
+
+            // Izriši besedo glede na trenutni način
+            const display = document.getElementById('wordDisplayContainer');
+            const hint = document.getElementById('interactionHint');
+
+            if (currentMode === 'word') {
+                display.innerHTML = `
+                    <div onclick="speakCurrentWordSlow()" class="cursor-pointer font-display text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-wider text-slate-800 hover:text-sky-600 transition-colors animate-pop px-4 py-2 rounded-2xl">
+                        ${item.word}
+                    </div>
+                `;
+                hint.textContent = 'Klikni na besedo ali sliko za počasno izgovorjavo.';
+            } 
+            else if (currentMode === 'syllables') {
+                const pillsHtml = item.syllables.map((syl, index) => {
+                    const style = SYLLABLE_STYLES[index % SYLLABLE_STYLES.length];
+                    return `
+                        <button id="syl-pill-${index}" 
+                            onclick="speakSingleSyllable(${index})"
+                            style="color: ${style.ringColor};"
+                            class="syllable-pill ${style.bg} border-2 ${style.border} px-5 sm:px-7 py-2.5 sm:py-3.5 rounded-2xl sm:rounded-3xl cursor-pointer flex items-center justify-center animate-pop">
+                            <span class="font-display text-3xl sm:text-5xl md:text-6xl font-extrabold text-white tracking-wide drop-shadow-sm">
+                                ${syl}
+                            </span>
+                        </button>
+                    `;
+                }).join('<span class="text-slate-300 font-black text-2xl sm:text-4xl mx-0.5">-</span>');
+
+                display.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-2">
+                        ${pillsHtml}
+                    </div>
+                `;
+                hint.textContent = '👆 Klikni na posamezen obarvan zlog, da ga slišiš!';
+            } 
+            else if (currentMode === 'initial') {
+                const firstLetter = item.word.charAt(0);
+                const restOfWord = item.word.slice(1);
+                const phonetic = PHONETIC_INITIALS[firstLetter] || { soundDisplay: firstLetter.toLowerCase(), speakText: firstLetter.toLowerCase() };
+
+                display.innerHTML = `
+                    <div class="flex flex-col items-center gap-2 animate-pop">
+                        <div class="flex items-center justify-center gap-2 sm:gap-4 bg-emerald-50 border-2 border-emerald-200 px-5 py-2.5 rounded-3xl shadow-sm">
+                            <span class="font-display text-4xl sm:text-6xl font-black text-emerald-600 bg-white w-14 h-14 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center shadow-sm border border-emerald-200">
+                                ${firstLetter}
+                            </span>
+                            <span class="text-emerald-400 font-black text-2xl sm:text-3xl">—</span>
+                            <span class="font-display text-3xl sm:text-5xl font-bold text-teal-700 italic px-2">
+                                "${phonetic.soundDisplay}"
+                            </span>
+                            <span class="text-emerald-400 font-black text-2xl sm:text-3xl">—</span>
+                            <span class="font-display text-3xl sm:text-5xl font-extrabold tracking-wide text-slate-800">
+                                <span class="text-emerald-600 underline decoration-4 underline-offset-4">${firstLetter}</span>${restOfWord}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                hint.textContent = `Beseda ${item.word} se začne na glas "${phonetic.soundDisplay}" (črka ${firstLetter}).`;
+            }
+        }
+
+        function updateModeButtonsUI() {
+            const btnWord = document.getElementById('btnSpeakWord');
+            const btnSyl = document.getElementById('btnSyllables');
+            const btnInit = document.getElementById('btnInitialSound');
+
+            [btnWord, btnSyl, btnInit].forEach(b => b.classList.remove('ring-4', 'ring-offset-2', 'ring-slate-800/30', 'scale-[1.02]'));
+
+            if (currentMode === 'word') btnWord.classList.add('ring-4', 'ring-offset-2', 'ring-sky-400', 'scale-[1.02]');
+            if (currentMode === 'syllables') btnSyl.classList.add('ring-4', 'ring-offset-2', 'ring-amber-400', 'scale-[1.02]');
+            if (currentMode === 'initial') btnInit.classList.add('ring-4', 'ring-offset-2', 'ring-emerald-400', 'scale-[1.02]');
+        }
+
+        // GUMB 1: Poslušaj celo besedo počasi
+        function activateWordMode() {
+            currentMode = 'word';
+            renderCard();
+            speakCurrentWordSlow();
+        }
+
+        function speakCurrentWordSlow() {
+            const item = wordsList[currentIndex];
+            const illusBox = document.getElementById('illustrationBox');
+            illusBox.classList.add('animate-bounce-short');
+            setTimeout(() => illusBox.classList.remove('animate-bounce-short'), 600);
+
+            speakText(item.word, 0.72);
+        }
+
+        // GUMB 2: Zlogovanje (zaporedno prebere in osvetli vse zloge)
+        function activateSyllableMode() {
+            currentMode = 'syllables';
+            renderCard();
+            playAllSyllablesSequentially();
+        }
+
+        function playAllSyllablesSequentially() {
+            clearTimeout(speechTimer);
+            const item = wordsList[currentIndex];
+            let idx = 0;
+
+            function step() {
+                if (currentMode !== 'syllables' || idx >= item.syllables.length) return;
+                highlightSyllablePill(idx);
+                const sylSpeech = prepareSyllableForSpeech(item.syllables[idx]);
+                
+                speakText(sylSpeech, 0.72, () => {
+                    idx++;
+                    if (idx < item.syllables.length && currentMode === 'syllables') {
+                        speechTimer = setTimeout(step, 260);
+                    }
+                });
+            }
+
+            step();
+        }
+
+        function highlightSyllablePill(index) {
+            // Odstrani aktivni razred z vseh
+            document.querySelectorAll('.syllable-pill').forEach(el => el.classList.remove('syllable-active'));
+            const pill = document.getElementById(`syl-pill-${index}`);
+            if (pill) {
+                pill.classList.add('syllable-active');
+                setTimeout(() => {
+                    pill.classList.remove('syllable-active');
+                }, 850);
+            }
+        }
+
+        // Klik na posamezen zlog
+        function speakSingleSyllable(index) {
+            clearTimeout(speechTimer);
+            const item = wordsList[currentIndex];
+            const syl = item.syllables[index];
+            if (!syl) return;
+
+            highlightSyllablePill(index);
+            speakText(prepareSyllableForSpeech(syl), 0.72);
+        }
+
+        // GUMB 3: Začetni glas
+        function activateInitialSoundMode() {
+            currentMode = 'initial';
+            renderCard();
+
+            const item = wordsList[currentIndex];
+            const firstLetter = item.word.charAt(0);
+            const phonetic = PHONETIC_INITIALS[firstLetter] || { soundDisplay: firstLetter.toLowerCase(), speakText: firstLetter.toLowerCase() };
+
+            // Najprej izgovori prvi glas, nato po kratkem premoru še celo besedo
+            speakText(phonetic.speakText, 0.68, () => {
+                if (currentMode === 'initial') {
+                    speechTimer = setTimeout(() => {
+                        speakText(item.word, 0.75);
+                    }, 350);
+                }
+            });
+        }
+
+        // Navigacija med besedami
+        function selectWord(index) {
+            currentIndex = index;
+            currentMode = 'word';
+            renderCarousel();
+            renderCard();
+            speakCurrentWordSlow();
+        }
+
+        function prevWord() {
+            const nextIdx = (currentIndex - 1 + wordsList.length) % wordsList.length;
+            selectWord(nextIdx);
+        }
+
+        function nextWord() {
+            const nextIdx = (currentIndex + 1) % wordsList.length;
+            selectWord(nextIdx);
+        }
+
+        /**
+         * ============================================================================
+         * 6. UČITELJSKI KOTIČEK - DODAJANJE POLJUBNIH BESED
+         * ============================================================================
+         */
+        function toggleTeacherPanel() {
+            const panel = document.getElementById('teacherPanel');
+            const chevron = document.getElementById('teacherChevron');
+            const isHidden = panel.classList.contains('hidden');
+
+            if (isHidden) {
+                panel.classList.remove('hidden');
+                chevron.style.transform = 'rotate(180deg)';
+                document.getElementById('customWordInput').focus();
+            } else {
+                panel.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function setEmoji(emoji) {
+            document.getElementById('customEmojiInput').value = emoji;
+        }
+
+        function updateLiveSyllablePreview() {
+            const wordInput = document.getElementById('customWordInput').value;
+            const sylInput = document.getElementById('customSyllablesInput');
+            const autoSyllables = syllabifySlovenian(wordInput);
+            sylInput.value = autoSyllables.join('-');
+        }
+
+        function handleCustomWord(event) {
+            event.preventDefault();
+            const rawWord = document.getElementById('customWordInput').value.trim().toUpperCase();
+            const rawSyl = document.getElementById('customSyllablesInput').value.trim().toUpperCase();
+            const emoji = document.getElementById('customEmojiInput').value.trim() || '🌟';
+
+            if (!rawWord) return;
+
+            // Očisti besedo dovoljenih znakov
+            const cleanWord = rawWord.replace(/[^A-ZČŠŽĆĐ]/g, '');
+            if (!cleanWord) {
+                showToast('Prosimo, vpišite veljavno slovensko besedo.');
+                return;
+            }
+
+            // Pridobi zloge iz polja (če jih je učiteljica ročno popravila) ali iz algoritma
+            let finalSyllables = rawSyl
+                .split('-')
+                .map(s => s.replace(/[^A-ZČŠŽĆĐ]/g, ''))
+                .filter(s => s.length > 0);
+
+            if (finalSyllables.length === 0 || finalSyllables.join('') !== cleanWord) {
+                finalSyllables = syllabifySlovenian(cleanWord);
+            }
+
+            // Preveri, če beseda že obstaja v seznamu
+            const existingIdx = wordsList.findIndex(w => w.word === cleanWord);
+            if (existingIdx !== -1) {
+                wordsList[existingIdx].syllables = finalSyllables;
+                if (!wordsList[existingIdx].svg) {
+                    wordsList[existingIdx].emoji = emoji;
+                }
+                selectWord(existingIdx);
+                showToast(`Beseda "${cleanWord}" je posodobljena!`);
+            } else {
+                // Dodaj novo besedo na začetek seznama
+                wordsList.unshift({
+                    word: cleanWord,
+                    syllables: finalSyllables,
+                    emoji: emoji
+                });
+                selectWord(0);
+                showToast(`Dodana nova beseda: ${finalSyllables.join(' - ')}`);
+            }
+
+            // Počisti vnosna polja in zapri učiteljski panel za nemoteno delo z otrokom
+            document.getElementById('customWordInput').value = '';
+            document.getElementById('customSyllablesInput').value = '';
+            toggleTeacherPanel();
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toastMessage');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        // Podpora za tipkovnico (puščice levo/desno, preslednica za branje)
+        document.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
+            if (e.key === 'ArrowRight') nextWord();
+            if (e.key === 'ArrowLeft') prevWord();
+            if (e.key === ' ') {
+                e.preventDefault();
+                speakCurrentWordSlow();
+            }
+        });
+
+        // Zagon ob nalaganju strani
+        window.addEventListener('DOMContentLoaded', () => {
+            initVoices();
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.onvoiceschanged = initVoices;
+            }
+            renderCarousel();
+            renderCard();
+        });
+    </script>
+</body>
+</html>
